@@ -1,0 +1,153 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  SPECTATEUR
+  GESTIONNAIRE
+  ADMIN
+}
+
+enum ReservationType {
+  STANDARD
+  VIP
+  PREMIUM
+}
+
+enum PaymentMode {
+  MOBILE_MONEY
+  CARD
+  CASH
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  role          UserRole  @default(SPECTATEUR)
+  
+  // Spectateur specific fields
+  nomSpect      String?
+  postnomSpect  String?
+  prenomSpect   String?
+  villeSpect    String?
+  numphone      String?
+  
+  // Agent/Gestionnaire specific fields
+  nomAgent      String?
+  prenomAgent   String?
+  service       String?
+  
+  accounts      Account[]
+  sessions      Session[]
+  reservations  Reservation[]
+  programmes    Programme[]
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Programme {
+  id          String   @id @default(cuid())
+  nomEquipe1  String
+  nomEquipe2  String
+  stadium     String
+  date        DateTime
+  version     String?
+  division    String?
+  prixA       Float
+  prixB       Float
+  
+  createdBy   String
+  agent       User     @relation(fields: [createdBy], references: [id])
+  
+  reservations Reservation[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Reservation {
+  id              String          @id @default(cuid())
+  dateReservation DateTime        @default(now())
+  typeReservation ReservationType @default(STANDARD)
+  nombreBillet    Int
+  
+  spectateur      User            @relation(fields: [spectateurId], references: [id])
+  spectateurId    String
+  
+  programme       Programme       @relation(fields: [programmeId], references: [id])
+  programmeId     String
+  
+  paiement        Paiement?
+  
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+model Paiement {
+  id            String        @id @default(cuid())
+  modePaiement  PaymentMode
+  datePaiement  DateTime      @default(now())
+  montant       Float
+  status        PaymentStatus @default(PENDING)
+  
+  reservation   Reservation   @relation(fields: [reservationId], references: [id])
+  reservationId String        @unique
+  
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
